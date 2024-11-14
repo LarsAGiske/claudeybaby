@@ -137,7 +137,7 @@ if app_password == correct_password:
 
         try:
             # Get response from Claude
-            bot_response = get_claude_response(conversation, selected_model, anthropic_client, max_tokens=150)
+            bot_response = get_claude_response(conversation, selected_model, anthropic_client, max_tokens=4096)
             if bot_response:
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": bot_response})
