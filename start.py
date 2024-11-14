@@ -47,7 +47,7 @@ if app_password == correct_password:
         return prompt
 
     # Function to interact with the Claude API using the SDK
-    def get_claude_response(conversation, model, client, max_tokens=3000):
+    def get_claude_response(conversation, model, client, max_tokens=4096):
         response = client.messages.create(
             model=model,
             max_tokens=max_tokens,
