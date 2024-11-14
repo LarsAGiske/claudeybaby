@@ -108,11 +108,14 @@ if app_password == correct_password:
             except Exception as e:
                 st.error(f"Error during analysis: {e}")
 
-    # Chat Feature with Claude
+    # Chat Feature with Claude using st.form
     st.subheader("Chat with Claude")
-    user_input = st.text_input("You:", placeholder="Type your message here...", key="user_input")
 
-    if st.button("Send"):
+    with st.form(key='chat_form', clear_on_submit=True):
+        user_input = st.text_input("You:", placeholder="Type your message here...", key="user_input_form")
+        submit_button = st.form_submit_button(label='Send')
+
+    if submit_button:
         if user_input.strip() != "":
             # Append user message to conversation history
             st.session_state.conversation.append({"role": "user", "content": user_input})
@@ -134,8 +137,6 @@ if app_password == correct_password:
                     else:
                         st.markdown(f"**Claude:** {message['content']}")
 
-                # Clear user input
-                st.session_state.user_input = ""
             except Exception as e:
                 st.error(f"Error during chat: {e}")
 
