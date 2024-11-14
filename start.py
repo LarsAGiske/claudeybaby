@@ -28,6 +28,7 @@ if app_password == correct_password:
         "claude-2",
         "claude-instant-1",
         "claude-3-5-sonnet-20241022",
+        "claude-3-5-sonnet-latest",
         # Add other models as needed
     ]
 
