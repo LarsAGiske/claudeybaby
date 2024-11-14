@@ -25,9 +25,11 @@ app_password = st.text_input("Enter the app password:", type="password")
 if app_password == correct_password:
     # Define available models manually with correct names
     available_models = [
-        "claude-3-haiku-20240301",
-        "claude-3-sonnet-20240211",
-        "claude-3-opus-20240229"
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229",
+        "claude-3-opus-20240229",
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-haiku-20241022"
         # Add other models as needed
     ]
 
