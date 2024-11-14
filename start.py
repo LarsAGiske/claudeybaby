@@ -3,22 +3,24 @@ import requests
 import fitz  # PyMuPDF for PDF handling
 from docx import Document
 
-# Title and authentication
+# App Title and Introduction
 st.title("Enhanced Claude Chatbot with File Analysis")
+st.write("Chat with Claude or upload a document for analysis.")
 
-# Password for app access
+# Authentication
 app_password = st.text_input("Enter the app password:", type="password")
-correct_password = "your_secure_password_here"  # Set this password securely
+correct_password = "your_secure_password_here"  # Set this securely
 
+# Verify password for app access
 if app_password == correct_password:
-    # Claude API Key input
-    claude_api_key = st.text_input("Enter Claude API Key:", type="password")
-    
-    # Claude API endpoints
+    # Retrieve Claude API key from Streamlit secrets
+    claude_api_key = st.secrets["claude_api_key"]
+
+    # Claude API endpoint URLs
     CLAUDE_API_MODELS_URL = "https://api.anthropic.com/v1/models"
     CLAUDE_API_CHAT_URL = "https://api.anthropic.com/v1/complete"
 
-    # Function to get available models
+    # Function to retrieve available models from Claude API
     def get_available_models(api_key):
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -29,7 +31,7 @@ if app_password == correct_password:
         models = response.json().get("models", [])
         return models
 
-    # Function to interact with Claude API
+    # Function to interact with the Claude API
     def get_claude_response(prompt, model, api_key):
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -44,16 +46,15 @@ if app_password == correct_password:
         response.raise_for_status()
         return response.json().get("completion")
 
-    # Retrieve and display available models after API key input
-    if claude_api_key:
-        try:
-            models = get_available_models(claude_api_key)
-            selected_model = st.selectbox("Choose a Claude Model:", models)
-        except requests.exceptions.RequestException as e:
-            st.error(f"Error fetching models: {e}")
-            models = []
+    # Retrieve and display available models after API key is verified
+    try:
+        models = get_available_models(claude_api_key)
+        selected_model = st.selectbox("Choose a Claude Model:", models)
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching models: {e}")
+        models = []
 
-    # File handling functions
+    # Functions for text extraction from files
     def extract_text_from_pdf(file):
         text = ""
         pdf = fitz.open(stream=file.read(), filetype="pdf")
@@ -79,7 +80,7 @@ if app_password == correct_password:
         st.write("Extracted Text from File:")
         st.write(file_content)
 
-        # Analysis with selected model
+        # Claude Analysis for the uploaded file
         if file_content:
             analysis_prompt = f"Analyze the following text:\n\n{file_content[:5000]}"
             try:
@@ -89,7 +90,7 @@ if app_password == correct_password:
             except requests.exceptions.RequestException as e:
                 st.error(f"Error: {e}")
 
-    # Chat feature with selected model
+    # Chat Feature with Claude
     user_input = st.text_input("You:", placeholder="Type your message here...")
     if user_input and selected_model:
         try:
