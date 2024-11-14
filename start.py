@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
 import fitz  # PyMuPDF for PDF handling
 from docx import Document
 
@@ -23,56 +23,43 @@ except KeyError as e:
 app_password = st.text_input("Enter the app password:", type="password")
 
 if app_password == correct_password:
-    # Define available models manually with correct names
+    # Define available models
     available_models = [
-        "claude-3-haiku-20240307",
-        "claude-3-sonnet-20240229",
-        "claude-3-opus-20240229",
-        "claude-3-5-sonnet-20241022",
-        "claude-3-5-haiku-20241022"
+        "claude-2",
+        "claude-instant-1",
         # Add other models as needed
     ]
 
     # Model Selection
     selected_model = st.selectbox("Choose a Claude Model:", available_models)
 
-    # Claude API endpoint
-    CLAUDE_API_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
+    # Initialize Anthropic client
+    anthropic_client = Anthropic(api_key=claude_api_key)
 
-    # Function to interact with the Claude API
-    def get_claude_response(messages, model, api_key, max_tokens=150):
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "messages": messages
-        }
-        response = requests.post(CLAUDE_API_MESSAGES_URL, headers=headers, json=data)
-        if response.status_code == 401:
-            st.error("Unauthorized: Check your Claude API key.")
-            st.stop()
-        elif response.status_code != 200:
-            st.error(f"Error {response.status_code}: {response.text}")
-            st.stop()
+    # Function to build the prompt
+    def build_prompt(conversation):
+        prompt = ""
+        for message in conversation:
+            if message["role"] == "user":
+                prompt += f"{HUMAN_PROMPT} {message['content']}"
+            else:
+                prompt += f"{AI_PROMPT} {message['content']}"
+        prompt += AI_PROMPT
+        return prompt
 
-        response_json = response.json()
-        # Extract assistant's message
-        if "completion" in response_json and response_json["completion"]:
-            return response_json["completion"]
-        elif "messages" in response_json:
-            assistant_messages = [
-                msg["content"] for msg in response_json["messages"] if msg["role"] == "assistant"
-            ]
-            if assistant_messages:
-                return assistant_messages[-1]
-        else:
-            st.error("Unexpected API response structure.")
-            st.stop()
-        return None
+    # Function to interact with the Claude API using the SDK
+    def get_claude_response(conversation, model, client, max_tokens=150):
+        prompt = build_prompt(conversation)
+
+        response = client.completions.create(
+            model=model,
+            max_tokens_to_sample=max_tokens,
+            prompt=prompt,
+            stop_sequences=[HUMAN_PROMPT],
+        )
+
+        # The assistant's reply is in response.completion
+        return response.completion.strip()
 
     # Functions for text extraction from files
     def extract_text_from_pdf(file):
@@ -111,15 +98,16 @@ if app_password == correct_password:
             st.write(file_content[:1000] + "...")  # Display only the first 1000 characters for brevity
 
             # Claude Analysis for the uploaded file
-            analysis_prompt = f"Analyze the following text:\n\n{file_content[:5000]}"  # Limit text length
-            analysis_messages = [
-                {"role": "user", "content": analysis_prompt}
-            ]
+            analysis_prompt = f"Please analyze the following text:\n\n{file_content[:5000]}"  # Limit text length
+            analysis_conversation = [{"role": "user", "content": analysis_prompt}]
+
             try:
-                analysis_response = get_claude_response(analysis_messages, selected_model, claude_api_key, max_tokens=500)
+                analysis_response = get_claude_response(analysis_conversation, selected_model, anthropic_client, max_tokens=500)
                 if analysis_response:
                     with st.chat_message("assistant"):
                         st.markdown(analysis_response)
+                else:
+                    st.error("Claude did not return a response.")
             except Exception as e:
                 st.error(f"Error during analysis: {e}")
 
@@ -138,12 +126,12 @@ if app_password == correct_password:
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Prepare messages for API call
-        messages = st.session_state.messages.copy()
+        # Prepare conversation for API call
+        conversation = st.session_state.messages.copy()
 
         try:
             # Get response from Claude
-            bot_response = get_claude_response(messages, selected_model, claude_api_key, max_tokens=150)
+            bot_response = get_claude_response(conversation, selected_model, anthropic_client, max_tokens=150)
             if bot_response:
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": bot_response})
