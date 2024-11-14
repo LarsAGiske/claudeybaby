@@ -19,20 +19,18 @@ except KeyError as e:
 app_password = st.text_input("Enter the app password:", type="password")
 
 if app_password == correct_password:
-    # Claude API endpoint URLs
-    CLAUDE_API_MODELS_URL = "https://api.anthropic.com/v1/models"
-    CLAUDE_API_CHAT_URL = "https://api.anthropic.com/v1/complete"
+    # Define available models manually
+    available_models = [
+        "claude-1",
+        "claude-instant"
+        # Add other models as needed
+    ]
 
-    # Function to retrieve available models from Claude API
-    def get_available_models(api_key):
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        response = requests.get(CLAUDE_API_MODELS_URL, headers=headers)
-        response.raise_for_status()
-        models = response.json().get("models", [])
-        return models
+    # Model Selection
+    selected_model = st.selectbox("Choose a Claude Model:", available_models)
+
+    # Claude API endpoint
+    CLAUDE_API_CHAT_URL = "https://api.anthropic.com/v1/complete"
 
     # Function to interact with the Claude API
     def get_claude_response(prompt, model, api_key):
@@ -49,28 +47,26 @@ if app_password == correct_password:
         response.raise_for_status()
         return response.json().get("completion")
 
-    # Retrieve and display available models after API key is verified
-    try:
-        models = get_available_models(claude_api_key)
-        if not models:
-            st.warning("No models available. Please check your API key and permissions.")
-        selected_model = st.selectbox("Choose a Claude Model:", models)
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching models: {e}")
-        st.stop()
-
     # Functions for text extraction from files
     def extract_text_from_pdf(file):
         text = ""
-        pdf = fitz.open(stream=file.read(), filetype="pdf")
-        for page in pdf:
-            text += page.get_text("text")
-        pdf.close()
+        try:
+            pdf = fitz.open(stream=file.read(), filetype="pdf")
+            for page in pdf:
+                text += page.get_text("text")
+            pdf.close()
+        except Exception as e:
+            st.error(f"Error reading PDF file: {e}")
         return text
 
     def extract_text_from_docx(file):
-        doc = Document(file)
-        return "\n".join([para.text for para in doc.paragraphs])
+        text = ""
+        try:
+            doc = Document(file)
+            text = "\n".join([para.text for para in doc.paragraphs])
+        except Exception as e:
+            st.error(f"Error reading DOCX file: {e}")
+        return text
 
     # File Upload and Analysis
     uploaded_file = st.file_uploader("Upload a PDF or DOCX file", type=["pdf", "docx"])
@@ -82,12 +78,12 @@ if app_password == correct_password:
         elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
             file_content = extract_text_from_docx(uploaded_file)
 
-        st.write("Extracted Text from File:")
-        st.write(file_content)
-
-        # Claude Analysis for the uploaded file
         if file_content:
-            analysis_prompt = f"Analyze the following text:\n\n{file_content[:5000]}"
+            st.write("Extracted Text from File:")
+            st.write(file_content[:1000] + "...")  # Display only the first 1000 characters for brevity
+
+            # Claude Analysis for the uploaded file
+            analysis_prompt = f"Analyze the following text:\n\n{file_content[:5000]}"  # Limit text length for Claude's input
             try:
                 analysis_response = get_claude_response(analysis_prompt, selected_model, claude_api_key)
                 st.write("Claude's Analysis:")
