@@ -7,15 +7,18 @@ from docx import Document
 st.title("Enhanced Claude Chatbot with File Analysis")
 st.write("Chat with Claude or upload a document for analysis.")
 
+# Retrieve secrets
+try:
+    claude_api_key = st.secrets["claude_api_key"]
+    correct_password = st.secrets["app_password"]
+except KeyError as e:
+    st.error(f"Missing secret: {e}. Please check your Streamlit secrets.")
+    st.stop()
+
 # Authentication
 app_password = st.text_input("Enter the app password:", type="password")
-correct_password = "your_secure_password_here"  # Set this securely
 
-# Verify password for app access
 if app_password == correct_password:
-    # Retrieve Claude API key from Streamlit secrets
-    claude_api_key = st.secrets["claude_api_key"]
-
     # Claude API endpoint URLs
     CLAUDE_API_MODELS_URL = "https://api.anthropic.com/v1/models"
     CLAUDE_API_CHAT_URL = "https://api.anthropic.com/v1/complete"
@@ -49,10 +52,12 @@ if app_password == correct_password:
     # Retrieve and display available models after API key is verified
     try:
         models = get_available_models(claude_api_key)
+        if not models:
+            st.warning("No models available. Please check your API key and permissions.")
         selected_model = st.selectbox("Choose a Claude Model:", models)
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching models: {e}")
-        models = []
+        st.stop()
 
     # Functions for text extraction from files
     def extract_text_from_pdf(file):
@@ -88,7 +93,7 @@ if app_password == correct_password:
                 st.write("Claude's Analysis:")
                 st.write(analysis_response)
             except requests.exceptions.RequestException as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error during analysis: {e}")
 
     # Chat Feature with Claude
     user_input = st.text_input("You:", placeholder="Type your message here...")
@@ -97,6 +102,6 @@ if app_password == correct_password:
             bot_response = get_claude_response(user_input, selected_model, claude_api_key)
             st.write(f"Claude: {bot_response}")
         except requests.exceptions.RequestException as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error during chat: {e}")
 else:
     st.warning("Please enter the correct password to access the app.")
