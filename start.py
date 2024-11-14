@@ -27,6 +27,7 @@ if app_password == correct_password:
     available_models = [
         "claude-2",
         "claude-instant-1",
+        "claude-3-5-sonnet-20241022",
         # Add other models as needed
     ]
 
