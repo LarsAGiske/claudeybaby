@@ -4,8 +4,8 @@ import fitz  # PyMuPDF for PDF handling
 from docx import Document
 
 # Initialize session state for conversation history
-if 'conversation' not in st.session_state:
-    st.session_state.conversation = []
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
 
 # App Title and Introduction
 st.title("Enhanced Claude Chatbot with File Analysis")
@@ -58,7 +58,21 @@ if app_password == correct_password:
         elif response.status_code != 200:
             st.error(f"Error {response.status_code}: {response.text}")
             st.stop()
-        return response.json().get("completion")
+
+        response_json = response.json()
+        # Extract assistant's message
+        if "completion" in response_json and response_json["completion"]:
+            return response_json["completion"]
+        elif "messages" in response_json:
+            assistant_messages = [
+                msg["content"] for msg in response_json["messages"] if msg["role"] == "assistant"
+            ]
+            if assistant_messages:
+                return assistant_messages[-1]
+        else:
+            st.error("Unexpected API response structure.")
+            st.stop()
+        return None
 
     # Functions for text extraction from files
     def extract_text_from_pdf(file):
@@ -97,48 +111,48 @@ if app_password == correct_password:
             st.write(file_content[:1000] + "...")  # Display only the first 1000 characters for brevity
 
             # Claude Analysis for the uploaded file
-            analysis_prompt = f"Analyze the following text:\n\n{file_content[:5000]}"  # Limit text length for Claude's input
+            analysis_prompt = f"Analyze the following text:\n\n{file_content[:5000]}"  # Limit text length
             analysis_messages = [
                 {"role": "user", "content": analysis_prompt}
             ]
             try:
                 analysis_response = get_claude_response(analysis_messages, selected_model, claude_api_key, max_tokens=500)
-                st.write("**Claude's Analysis:**")
-                st.write(analysis_response)
+                if analysis_response:
+                    with st.chat_message("assistant"):
+                        st.markdown(analysis_response)
             except Exception as e:
                 st.error(f"Error during analysis: {e}")
 
-    # Chat Feature with Claude using st.form
+    # Chat Feature with Claude using Streamlit chat elements
     st.subheader("Chat with Claude")
 
-    with st.form(key='chat_form', clear_on_submit=True):
-        user_input = st.text_input("You:", placeholder="Type your message here...", key="user_input_form")
-        submit_button = st.form_submit_button(label='Send')
+    # Display previous chat messages
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-    if submit_button:
-        if user_input.strip() != "":
-            # Append user message to conversation history
-            st.session_state.conversation.append({"role": "user", "content": user_input})
+    # Accept user input
+    if prompt := st.chat_input("Type your message here..."):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-            # Prepare messages for API
-            messages = st.session_state.conversation.copy()
+        # Prepare messages for API call
+        messages = st.session_state.messages.copy()
 
-            try:
-                # Get response from Claude
-                bot_response = get_claude_response(messages, selected_model, claude_api_key, max_tokens=150)
-
-                # Append assistant response to conversation history
-                st.session_state.conversation.append({"role": "assistant", "content": bot_response})
-
-                # Display the conversation
-                for message in st.session_state.conversation:
-                    if message["role"] == "user":
-                        st.markdown(f"**You:** {message['content']}")
-                    else:
-                        st.markdown(f"**Claude:** {message['content']}")
-
-            except Exception as e:
-                st.error(f"Error during chat: {e}")
+        try:
+            # Get response from Claude
+            bot_response = get_claude_response(messages, selected_model, claude_api_key, max_tokens=150)
+            if bot_response:
+                # Add assistant response to chat history
+                st.session_state.messages.append({"role": "assistant", "content": bot_response})
+                with st.chat_message("assistant"):
+                    st.markdown(bot_response)
+            else:
+                st.error("Claude did not return a response.")
+        except Exception as e:
+            st.error(f"Error during chat: {e}")
 
 else:
     st.warning("Please enter the correct password to access the app.")
